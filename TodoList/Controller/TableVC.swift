@@ -11,10 +11,12 @@ import UIKit
 class TableVC: UITableViewController {
 
     var itemModelArray = [ItemModel]()
+    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Do any additional setup after loading the view, typically from a nib.
+        loadData()
+        
     }
 
     
@@ -35,7 +37,7 @@ class TableVC: UITableViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
         itemModelArray[indexPath.row].isChecked = !itemModelArray[indexPath.row].isChecked
-        tableView.reloadData()
+        saveData()
         tableView.deselectRow(at: indexPath, animated: true)
     }
     
@@ -47,7 +49,8 @@ class TableVC: UITableViewController {
             if let textString = alertC.textFields![0].text {
                 if textString != " "{
                     self.itemModelArray.append(ItemModel(textString, false))
-                    self.tableView.reloadData()
+                    self.saveData()
+                    
                 }
             }
             
@@ -61,6 +64,30 @@ class TableVC: UITableViewController {
         
         self.present(alertC, animated: true, completion: nil)
         
+    }
+    
+    func saveData() {
+        let encoder = PropertyListEncoder()
+        do{
+            let data = try encoder.encode(self.itemModelArray)
+            try data.write(to: self.dataFilePath!)
+        } catch {
+            print("Error encoding item array")
+        }
+        self.tableView.reloadData()
+    }
+    
+    func loadData() {
+        if let data = try? Data(contentsOf: dataFilePath!){
+            let decoder = PropertyListDecoder()
+            do {
+                itemModelArray = try decoder.decode([ItemModel].self, from: data)
+            }catch {
+                print("Error : \(error.localizedDescription)")
+            }
+        }
+
+
     }
     
 }
