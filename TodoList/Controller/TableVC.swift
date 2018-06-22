@@ -7,16 +7,18 @@
 //
 
 import UIKit
+import CoreData
 
-class TableVC: UITableViewController {
+class TableVC: UITableViewController{
 
-    var itemModelArray = [ItemModel]()
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
+    var itemModelArray = [Item]()
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
         loadData()
-        
     }
 
     
@@ -27,9 +29,9 @@ class TableVC: UITableViewController {
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ItemList", for: indexPath)
-        let selectedItem = itemModelArray[indexPath.row]
-        cell.textLabel?.text = selectedItem.title
-        cell.accessoryType = selectedItem.isChecked == true ? .checkmark : .none
+        let currentItem = itemModelArray[indexPath.row]
+        cell.textLabel?.text = currentItem.title
+        cell.accessoryType = currentItem.isChecked == true ? .checkmark : .none
         return cell
     }
     
@@ -48,9 +50,11 @@ class TableVC: UITableViewController {
             
             if let textString = alertC.textFields![0].text {
                 if textString != " "{
-                    self.itemModelArray.append(ItemModel(textString, false))
+                    let newItem = Item(context: self.context)
+                    newItem.title = textString
+                    newItem.isChecked = false
+                    self.itemModelArray.append(newItem)
                     self.saveData()
-                    
                 }
             }
             
@@ -66,29 +70,50 @@ class TableVC: UITableViewController {
         
     }
     
+
     func saveData() {
-        let encoder = PropertyListEncoder()
         do{
-            let data = try encoder.encode(self.itemModelArray)
-            try data.write(to: self.dataFilePath!)
+            try context.save()
         } catch {
-            print("Error encoding item array")
+            print("Error saving item: \(error.localizedDescription)")
         }
         self.tableView.reloadData()
     }
     
-    func loadData() {
-        if let data = try? Data(contentsOf: dataFilePath!){
-            let decoder = PropertyListDecoder()
-            do {
-                itemModelArray = try decoder.decode([ItemModel].self, from: data)
-            }catch {
-                print("Error : \(error.localizedDescription)")
-            }
+    
+    func loadData(with request : NSFetchRequest<Item> = Item.fetchRequest()) {
+        
+        do {
+            itemModelArray = try context.fetch(request)
+            
+        }catch {
+            print("Error attempting to fetch data: \(error.localizedDescription)")
         }
-
-
     }
     
+}
+
+//MARK: Search bar methods
+
+extension TableVC: UISearchBarDelegate {
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        let itemRequest : NSFetchRequest<Item> = Item.fetchRequest()
+        itemRequest.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+        itemRequest.sortDescriptors =  [NSSortDescriptor(key: "title", ascending: true)]
+        loadData(with: itemRequest)
+        tableView.reloadData()
+        
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0 {
+            loadData()
+            tableView.reloadData()
+            DispatchQueue.main.async {
+                 searchBar.resignFirstResponder()
+            }
+           
+        }
+    }
 }
 
